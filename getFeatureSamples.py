@@ -29,23 +29,31 @@ logging.info(f"\n\n===============================\nStarting script: {scriptDire
 
 arcpy.env.overwriteOutput = True
 
+# Load config once at module level so every function below can reference it
+configPath = f"{scriptDirectory}/config.json"
+with open(configPath, "r") as configFile:
+    config = json.load(configFile)
 
-def getSample(gis_GTG, serviceUrl, groupField, groupValues, recordsPerGroup, needsGeometry):
+
+def getSample():
     """
     Connects to the feature service and pulls a random sample of
     recordsPerGroup records per group value. Returns a single combined
     spatially enabled dataframe.
     """
-    featureLayer = FeatureLayer(serviceUrl, gis=gis_GTG)
-    logging.info(f"Connected to feature layer: {serviceUrl}")
+    gis_GTG = GIS("Pro")
+    logging.info("Authenticated to Portal via GIS(\"Pro\")")
+
+    featureLayer = FeatureLayer(config["serviceUrl"], gis=gis_GTG)
+    logging.info(f"Connected to feature layer: {config['serviceUrl']}")
 
     oidField = featureLayer.properties.objectIdField
     logging.info(f"Detected object ID field: {oidField}")
 
     sampleFrames = []
 
-    for groupValue in groupValues:
-        whereClause = f"{groupField} = '{groupValue}'"
+    for groupValue in config["groupValues"]:
+        whereClause = f"{config['groupField']} = '{groupValue}'"
         logging.info(f"Finding candidate {oidField} values for group: {groupValue}")
 
         idResult = featureLayer.query(
@@ -60,7 +68,7 @@ def getSample(gis_GTG, serviceUrl, groupField, groupValues, recordsPerGroup, nee
             logging.warning(f"No candidate records found for group: {groupValue}")
             continue
 
-        sampleSize = min(recordsPerGroup, len(candidateIds))
+        sampleSize = min(config["recordsPerGroup"], len(candidateIds))
         sampledIds = random.sample(candidateIds, sampleSize)
         logging.info(f"Randomly sampled {sampleSize} {oidField} values for group: {groupValue}")
 
@@ -70,7 +78,7 @@ def getSample(gis_GTG, serviceUrl, groupField, groupValues, recordsPerGroup, nee
         featureSet = featureLayer.query(
             where=sampleWhereClause,
             out_fields="*",
-            return_geometry=needsGeometry
+            return_geometry=config["writeGdb"]
         )
 
         groupSdf = featureSet.sdf
@@ -92,73 +100,36 @@ def getSample(gis_GTG, serviceUrl, groupField, groupValues, recordsPerGroup, nee
     return combinedSdf
 
 
-def exportToGdb(sdf, outputGdb, outputFeatureClass):
+def exportToGdb(sdf):
     """
     Exports a spatially enabled dataframe to a file geodatabase feature
     class, creating the geodatabase first if it doesn't already exist.
     """
-    outputGdbPath = f"{scriptDirectory}/{outputGdb}"
+    outputGdbPath = f"{scriptDirectory}/{config['outputGdb']}"
     if not arcpy.Exists(outputGdbPath):
-        arcpy.management.CreateFileGDB(scriptDirectory, outputGdb)
+        arcpy.management.CreateFileGDB(scriptDirectory, config["outputGdb"])
         logging.info(f"Created file geodatabase: {outputGdbPath}")
 
-    outputPath = f"{outputGdbPath}/{outputFeatureClass}"
+    outputPath = f"{outputGdbPath}/{config['outputFeatureClass']}"
     sdf.spatial.to_featureclass(location=outputPath, overwrite=True)
     logging.info(f"Exported sample feature class to: {outputPath}")
 
 
-def exportToCsv(sdf, exportFields, outputCsv):
+def exportToCsv(sdf):
     """
     Exports selected fields from a dataframe to a CSV file.
     """
-    csvSdf = sdf[exportFields].copy()
+    csvSdf = sdf[config["exportFields"]].copy()
 
-    csvPath = f"{scriptDirectory}/{outputCsv}"
+    csvPath = f"{scriptDirectory}/{config['outputCsv']}"
     csvSdf.to_csv(csvPath, index=False)
     logging.info(f"Exported CSV summary to: {csvPath}")
 
 
-def runFeatureSample():
-    configPath = f"{scriptDirectory}/config.json"
-    with open(configPath, "r") as configFile:
-        config = json.load(configFile)
-
-    serviceUrl = config["serviceUrl"]
-    groupField = config["groupField"]
-    groupValues = config["groupValues"]
-    recordsPerGroup = config["recordsPerGroup"]
-    exportFields = config["exportFields"]
-    outputGdb = config["outputGdb"]
-    outputFeatureClass = config["outputFeatureClass"]
-    outputCsv = config["outputCsv"]
-    writeGdb = config["writeGdb"]
-    writeCsv = config["writeCsv"]
-
-    gis_GTG = GIS("Pro")
-    logging.info("Authenticated to Portal via GIS(\"Pro\")")
-
-    combinedSdf = getSample(
-        gis_GTG=gis_GTG,
-        serviceUrl=serviceUrl,
-        groupField=groupField,
-        groupValues=groupValues,
-        recordsPerGroup=recordsPerGroup,
-        needsGeometry=writeGdb
-    )
-
-    if combinedSdf is None:
-        logging.warning("No sample data retrieved. Exiting without export.")
-        return
-
-    if writeGdb:
-        exportToGdb(combinedSdf, outputGdb, outputFeatureClass)
-
-    if writeCsv:
-        exportToCsv(combinedSdf, exportFields, outputCsv)
-
-
 if __name__ == "__main__":
     try:
-        runFeatureSample()
+        sampleSdf = getSample()
+        exportToGdb(sampleSdf)
+        exportToCsv(sampleSdf)
     except Exception as e:
         logging.error(f"Script failed: {e}")
