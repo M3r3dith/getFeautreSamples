@@ -15,6 +15,5 @@
     "outputGdb": "sample_output.gdb",
     "outputFeatureClass": "featureSample",
     "outputCsv": "featureSample.csv",
-    "writeGdb": true,
-    "writeCsv": true
+    "writeGdb": true
 }
