@@ -1,0 +1,20 @@
+{
+    "serviceUrl": "https://services.arcgis.com/xxxxxxxx/arcgis/rest/services/YourFeatureService/FeatureServer/0",
+    "groupField": "county",
+    "groupValues": [
+        "GroupValueOne",
+        "GroupValueTwo",
+        "GroupValueThree"
+    ],
+    "recordsPerGroup": 10,
+    "exportFields": [
+        "county",
+        "parcelId",
+        "address"
+    ],
+    "outputGdb": "sample_output.gdb",
+    "outputFeatureClass": "featureSample",
+    "outputCsv": "featureSample.csv",
+    "writeGdb": true,
+    "writeCsv": true
+}
