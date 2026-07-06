@@ -32,8 +32,26 @@ layer without exporting the whole thing.
 | `outputGdb` | File geodatabase name for the feature class output |
 | `outputFeatureClass` | Feature class name inside `outputGdb` |
 | `outputCsv` | CSV filename for the attribute-only output |
-| `writeGdb` | `true`/`false`, whether to export the feature class |
-| `writeCsv` | `true`/`false`, whether to export the CSV |
+| `writeGdb` | `true`/`false`, whether to fetch geometry during sampling (set to `false` if you're only running the CSV export, to skip fetching geometry you don't need) |
+
+## Choosing which outputs to write
+
+Unlike the other settings, whether the gdb and/or CSV export actually run is
+controlled directly in the script, not in `config.json`. In `__main__`,
+comment out whichever export you don't need:
+
+```python
+if __name__ == "__main__":
+    try:
+        sampleSdf = getSample()
+        exportToGdb(sampleSdf)   # comment out to skip the gdb export
+        exportToCsv(sampleSdf)   # comment out to skip the CSV export
+    except Exception as e:
+        logging.error(f"Script failed: {e}")
+```
+
+If you comment out `exportToGdb()`, also set `"writeGdb": false` in
+`config.json` so the sampling step skips fetching geometry it won't use.
 
 ## Running
 
